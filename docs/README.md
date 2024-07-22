@@ -1,7 +1,7 @@
 <!--
  * @Author: benjie
  * @Date: 2024-07-21 23:19:51
- * @LastEditTime: 2024-07-22 11:13:24
+ * @LastEditTime: 2024-07-22 11:58:37
  * @LastEditors: benjie
  * @Description: 
 -->
@@ -611,7 +611,7 @@ export default Counter;
 
 ```plaintext
 First increment prevState: { count: 0 }
-Second increment prevState: { count: 0 }
+Second increment prevState: { count: 1 }
 ```
 
 ### 批量更新的效果
@@ -620,7 +620,7 @@ Second increment prevState: { count: 0 }
 
 ### 解决方法：依赖于 `prevState`
 
-为了确保每次 `setState` 调用都能正确地基于上一次更新的结果，可以依赖于 `prevState` 来计算新状态。通过以下示例可以看到，如何在实际场景中确保状态更新基于最新的 `prevState`：
+React 在批量处理 setState 调用时，保证每次 setState 的 prevState 是更新后的值。这是因为 setState 传递的函数式更新允许 React 确保每个更新都是基于最新的状态。
 
 ```jsx
 import React, { Component } from 'react';
@@ -665,3 +665,468 @@ export default Counter;
 - `prevState` 是调用 `setState` 函数时，React 传递给函数的当前状态值。
 - React 会在批量更新时，将所有的 `setState` 调用合并，并在最终更新状态时传递最新的 `prevState` 给每一个 `setState` 函数。
 - 为了确保状态更新基于最新的 `prevState`，应使用函数式的 `setState` 调用。
+- 
+## 示例：对象和数组的 `setState`
+在 React 中，当你使用 `setState` 更新状态时，React 通过比较前后的状态对象的内存地址（引用）来决定是否需要重新渲染组件。这意味着，如果状态对象的引用没有发生变化，React 会认为状态没有变化，从而不会触发重新渲染。
+
+为了确保 React 能正确地检测到状态变化，你需要创建一个新的对象或数组，而不是直接修改现有的对象或数组。
+
+#### 对象的 `setState` 示例
+![](imgs/2024-07-22-11-25-09.png)
+假设我们有一个包含对象的状态，我们希望更新对象的某个属性。
+
+```jsx
+import React, { Component } from 'react';
+
+class ObjectStateExample extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      user: {
+        name: 'John',
+        age: 30
+      }
+    };
+  }
+
+  updateName = () => {
+    this.setState((prevState) => ({
+      user: {
+        ...prevState.user,
+        name: 'Jane'
+      }
+    }));
+  };
+
+  render() {
+    return (
+      <div>
+        <p>Name: {this.state.user.name}</p>
+        <p>Age: {this.state.user.age}</p>
+        <button onClick={this.updateName}>Update Name</button>
+      </div>
+    );
+  }
+}
+
+export default ObjectStateExample;
+```
+
+在这个示例中，我们使用展开运算符 `...prevState.user` 创建一个新的 `user` 对象，并更新 `name` 属性。这样可以确保 `user` 对象的引用发生变化，从而触发重新渲染。
+
+#### 数组的 `setState` 示例
+
+假设我们有一个包含数组的状态，我们希望更新数组中的某个元素。
+
+```jsx
+import React, { Component } from 'react';
+
+class ArrayStateExample extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      items: ['Item 1', 'Item 2', 'Item 3']
+    };
+  }
+
+  updateItem = (index, newItem) => {
+    this.setState((prevState) => {
+      const newItems = [...prevState.items];
+      newItems[index] = newItem;
+      return { items: newItems };
+    });
+  };
+
+  render() {
+    return (
+      <div>
+        <ul>
+          {this.state.items.map((item, index) => (
+            <li key={index}>{item}</li>
+          ))}
+        </ul>
+        <button onClick={() => this.updateItem(1, 'Updated Item 2')}>Update Item 2</button>
+      </div>
+    );
+  }
+}
+
+export default ArrayStateExample;
+```
+
+在这个示例中，我们创建了一个新的 `items` 数组，并更新了指定索引处的元素。通过创建新的数组，可以确保数组的引用发生变化，从而触发重新渲染。
+
+### 总结
+
+- 为了让 React 检测到状态变化并触发重新渲染，状态对象或数组的引用必须发生变化。
+- 使用展开运算符 `...` 可以创建新的对象或数组，从而确保状态引用变化。
+- 避免直接修改现有的对象或数组，应该创建它们的新副本进行修改。
+
+当你没有使用展开运算符（或其他方法创建新对象或数组），而是直接修改现有对象或数组时，React 可能无法检测到状态变化，从而不会触发重新渲染。这是因为 React 通过比较状态对象的引用来判断状态是否发生了变化。如果引用没有改变，React 会认为状态没有发生变化。
+
+以下是一个示例，展示了没有使用展开运算符直接修改对象或数组时可能出现的问题。
+
+### 示例：没有使用展开运算符直接修改对象
+
+```jsx
+import React, { Component } from 'react';
+
+class ObjectStateNoSpread extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      user: {
+        name: 'John',
+        age: 30
+      }
+    };
+  }
+
+  updateName = () => {
+    // 直接修改现有对象
+    this.state.user.name = 'Jane';
+    // 由于直接修改了对象，React 不会检测到状态变化
+    this.setState({ user: this.state.user });
+  };
+
+  render() {
+    return (
+      <div>
+        <p>Name: {this.state.user.name}</p>
+        <p>Age: {this.state.user.age}</p>
+        <button onClick={this.updateName}>Update Name</button>
+      </div>
+    );
+  }
+}
+
+export default ObjectStateNoSpread;
+```
+
+### 示例：没有使用展开运算符直接修改数组
+
+```jsx
+import React, { Component } from 'react';
+
+class ArrayStateNoSpread extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      items: ['Item 1', 'Item 2', 'Item 3']
+    };
+  }
+
+  updateItem = (index, newItem) => {
+    // 直接修改现有数组
+    this.state.items[index] = newItem;
+    // 由于直接修改了数组，React 不会检测到状态变化
+    this.setState({ items: this.state.items });
+  };
+
+  render() {
+    return (
+      <div>
+        <ul>
+          {this.state.items.map((item, index) => (
+            <li key={index}>{item}</li>
+          ))}
+        </ul>
+        <button onClick={() => this.updateItem(1, 'Updated Item 2')}>Update Item 2</button>
+      </div>
+    );
+  }
+}
+
+export default ArrayStateNoSpread;
+```
+
+### 解释
+
+- **直接修改对象**：
+  在 `ObjectStateNoSpread` 组件中，`updateName` 方法直接修改了 `this.state.user` 对象的 `name` 属性，然后调用 `setState` 传递相同的对象。这种做法不会触发 React 的重新渲染，因为 `user` 对象的引用没有变化。React 认为状态没有变化，因此不会更新视图。
+
+- **直接修改数组**：
+  在 `ArrayStateNoSpread` 组件中，`updateItem` 方法直接修改了 `this.state.items` 数组的指定索引的元素，然后调用 `setState` 传递相同的数组。这种做法同样不会触发 React 的重新渲染，因为 `items` 数组的引用没有变化。React 认为状态没有变化，因此不会更新视图。
+
+### 正确的方法
+
+为了确保 React 能正确检测到状态变化并触发重新渲染，应该使用展开运算符或其他方法创建新对象或数组。以下是上面示例的正确版本：
+
+#### 使用展开运算符更新对象
+
+```jsx
+updateName = () => {
+  this.setState((prevState) => ({
+    user: {
+      ...prevState.user,
+      name: 'Jane'
+    }
+  }));
+};
+```
+
+#### 使用展开运算符更新数组
+
+```jsx
+updateItem = (index, newItem) => {
+  this.setState((prevState) => {
+    const newItems = [...prevState.items];
+    newItems[index] = newItem;
+    return { items: newItems };
+  });
+};
+```
+
+### 总结
+
+- 直接修改现有对象或数组时，React 可能无法检测到状态变化，因为对象或数组的引用没有改变。
+- 使用展开运算符或其他方法创建新对象或数组，以确保状态引用发生变化，从而触发 React 的重新渲染。
+
+
+## PureComponent只有这个问题
+你说得对，`PureComponent` 和 `Component` 在 React 的行为上确实有一些区别，尤其是在状态更新和性能优化方面。
+
+### `PureComponent` vs. `Component`
+
+#### `PureComponent`
+
+`PureComponent` 是 React 提供的一种优化机制，用于避免不必要的渲染。它通过实现 `shouldComponentUpdate` 方法，并对 `props` 和 `state` 进行浅比较（shallow comparison）来决定组件是否需要重新渲染。
+
+- **浅比较**：`PureComponent` 只会对 `props` 和 `state` 的引用进行比较，而不会深度比较对象内部的值。这意味着如果你直接修改了对象或数组的属性，而没有创建新的引用，`PureComponent` 可能会认为状态没有变化，从而不会触发重新渲染。
+
+- **实际行为**：由于 `PureComponent` 只进行浅比较，直接修改对象或数组的内容（而不改变其引用）可能会导致组件没有更新，尽管数据已被修改。
+
+#### `Component`
+
+`Component` 没有内置的 `shouldComponentUpdate` 方法。默认情况下，`Component` 会在状态或属性发生变化时重新渲染。你可以自定义 `shouldComponentUpdate` 来优化性能，但默认行为是每次状态或属性变化时都会重新渲染。
+
+- **完整渲染**：`Component` 在状态更新时总是会重新渲染，无论你是直接修改状态还是创建新的状态对象。它不会像 `PureComponent` 那样依赖于浅比较。
+
+### 示例
+
+#### `PureComponent` 示例
+
+```jsx
+import React, { PureComponent } from 'react';
+
+class MyPureComponent extends PureComponent {
+  constructor(props) {
+    super(props);
+    this.state = {
+      items: ['Item 1', 'Item 2', 'Item 3']
+    };
+  }
+
+  updateItem = (index, newItem) => {
+    // 直接修改数组的元素
+    this.state.items[index] = newItem;
+    // PureComponent 不会触发重新渲染
+    this.setState({ items: this.state.items });
+  };
+
+  render() {
+    return (
+      <div>
+        <ul>
+          {this.state.items.map((item, index) => (
+            <li key={index}>{item}</li>
+          ))}
+        </ul>
+        <button onClick={() => this.updateItem(1, 'Updated Item 2')}>Update Item 2</button>
+      </div>
+    );
+  }
+}
+
+export default MyPureComponent;
+```
+
+#### `Component` 示例
+
+```jsx
+import React, { Component } from 'react';
+
+class MyComponent extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      items: ['Item 1', 'Item 2', 'Item 3']
+    };
+  }
+
+  updateItem = (index, newItem) => {
+    // 直接修改数组的元素
+    this.state.items[index] = newItem;
+    // 组件会重新渲染
+    this.setState({ items: this.state.items });
+  };
+
+  render() {
+    return (
+      <div>
+        <ul>
+          {this.state.items.map((item, index) => (
+            <li key={index}>{item}</li>
+          ))}
+        </ul>
+        <button onClick={() => this.updateItem(1, 'Updated Item 2')}>Update Item 2</button>
+      </div>
+    );
+  }
+}
+
+export default MyComponent;
+```
+
+### 总结
+
+- `PureComponent` 通过浅比较来优化渲染，因此需要确保状态或属性的引用发生变化以触发重新渲染。
+- `Component` 默认情况下会在状态或属性发生变化时重新渲染，不依赖于浅比较。
+
+因此，**只有 `PureComponent`** 可能会遇到由于直接修改状态导致渲染未更新的问题，而 **`Component`** 通常不会受到这种影响。
+![](imgs/2024-07-22-11-42-34.png)
+```js
+
+import './App.css';
+import React from 'react';
+
+class App extends React.PureComponent {
+  state = {
+    a: 0,
+    b: 1,
+    c: {
+      c1: 123,
+      c2: 999
+    },
+    arr: [1, 2, 3]
+  }
+  addA = () => {
+    // this.setState((state) => {
+    //   return {
+    //     a:++state.a
+    //   }
+    // })
+    this.setState({
+      a: 1,
+    }, () => {
+      //在这里面才能获取到更新后的值
+      console.log(this.state.a)
+    })
+
+  }
+  addArr() {
+    //数组和对象-》判断是否改变-》内存地址判断的
+    // let _arr = [...this.state.arr]
+    // _arr.push(4);
+    // this.setState({
+    //   arr: _arr
+    // }, () => {
+    //   //此时内容变了，但是内存地址没变
+    //   console.log(this.state.arr)
+    // })
+    this.state.arr.push(4);
+    this.setState({
+      arr: this.state.arr
+    }, () => {
+      //此时内容变了，但是内存地址没变
+      console.log(this.state.arr)
+    })
+  }
+  render() {
+    return <div className="App">
+      {this.state.a}
+      <button onClick={this.addA}>加21</button>
+      c数据的内容
+      <div>
+        {this.state.c.c1}
+      </div>
+      <div>
+        {this.state.c.c2}
+      </div>
+      数组
+      <div>
+        {this.state.arr}
+      </div>
+      <button onClick={this.addArr.bind(this)}>添加数组</button>
+    </div>
+  }
+}
+
+export default App;
+```
+
+![](imgs/2024-07-22-11-41-04.png)
+
+# 5. 条件渲染和列表循环
+
+![](imgs/2024-07-22-11-44-47.png)
+
+![](imgs/2024-07-22-11-45-23.png)
+
+![](imgs/2024-07-22-11-46-05.png)
+
+
+
+show是false则不会被渲染；
+![](imgs/2024-07-22-11-47-26.png)
+
+![](imgs/2024-07-22-11-46-37.png)
+
+![](imgs/2024-07-22-11-58-31.png)
+```js
+import './App.css';
+import React from 'react';
+
+class App extends React.PureComponent {
+  state = {
+    show: true,
+    originArr: [1, 2, 3]//[1,2,3]=>[<div>1</div>,<div>2</div>,<div>3</div>]
+  }
+  f1() {
+    if (this.state.show) {
+      return <div>div1</div>
+    } else {
+      return "";
+    }
+  }
+  getArr() {
+    //for,map-最常用，filter
+    let newArr = [];
+    this.state.originArr.forEach((item) => {
+      newArr.push(<div>{item}</div>)
+    })
+    console.log(newArr);
+    return newArr;
+  }
+  addData = () => {
+    let _arr = [...this.state.originArr];
+    _arr.push(Math.random() * 10);
+    this.setState({
+      originArr: _arr
+    })
+  }
+  render() {
+    return <div className="App">
+      <div>条件渲染</div>
+      {/* {this.state.show && <div>div1</div>} */}
+      {this.f1()}
+      <button onClick={() => {
+        this.setState({
+          show: !this.state.show
+        })
+      }}>{this.state.show ? "隐藏" : "显示"}</button>
+      <div>列表渲染</div>
+      {/* {this.getArr()} */}
+      {
+        this.state.originArr.map((item) => {
+          return <div key={item}>{item}</div>
+        })
+      }
+      <button onClick={this.addData}>添加</button>
+    </div>
+  }
+}
+
+export default App;
+
+```
